@@ -55,6 +55,10 @@ func (c *Client) ListGroups() *[]models.Group {
     return &groupList
 }
 
+/*
+GetGroup Get a single group by its UID
+See: https://api.watchmanmonitoring.com/#get_group
+*/
 func (c *Client) GetGroup(uid string) *models.Group {
     response := c.doRequest("GET", fmt.Sprintf("/groups/%s", uid), nil)
 
