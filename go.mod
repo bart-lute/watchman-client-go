@@ -1,3 +1,3 @@
-module watchman-client-go
+module github.com/bart-lute/watchman-client-go
 
-go 1.25
+go 1.25.3
