@@ -1,12 +1,8 @@
 package watchman_client_go
 
 import (
-    "encoding/json"
     "fmt"
-    "io"
-    "log"
     "sort"
-    "strconv"
     "strings"
 
     "github.com/bart-lute/watchman-client-go/models"
@@ -18,41 +14,12 @@ See: https://api.watchmanmonitoring.com/#list_groups
 */
 func (c *Client) ListGroups() *[]models.Group {
     var groups []models.Group
-    var groupList []models.Group
+    c.getList("groups", &groups)
 
-    page := 1
-    for {
-        response := c.doRequest("GET", fmt.Sprintf("groups?page=%d", page), nil)
-        totalPages, err := strconv.Atoi(response.Header.Get("x-total-pages"))
-        if err != nil {
-            log.Fatal(err)
-        }
-        body, err := io.ReadAll(response.Body)
-        if err != nil {
-            log.Fatal(err)
-        }
-
-        // Close the Body
-        err = response.Body.Close()
-        if err != nil {
-            log.Fatal(err)
-        }
-
-        if err := json.Unmarshal(body, &groups); err != nil {
-            log.Fatal(err)
-        }
-
-        groupList = append(groupList, groups...)
-
-        if page >= totalPages {
-            break
-        }
-        page++
-
-    }
-
-    sort.Slice(groupList, func(i, j int) bool { return strings.ToLower(groupList[i].Name) < strings.ToLower(groupList[j].Name) })
-    return &groupList
+    sort.Slice(groups, func(i, j int) bool {
+        return strings.ToLower(groups[i].Name) < strings.ToLower(groups[j].Name)
+    })
+    return &groups
 }
 
 /*
@@ -60,25 +27,7 @@ GetGroup Get a single group by its UID
 See: https://api.watchmanmonitoring.com/#get_group
 */
 func (c *Client) GetGroup(uid string) *models.Group {
-    response := c.doRequest("GET", fmt.Sprintf("/groups/%s", uid), nil)
-
-    // Make sure to close the Body
-    defer func(Body io.ReadCloser) {
-        err := Body.Close()
-        if err != nil {
-            log.Fatal(err)
-        }
-    }(response.Body)
-
     var group models.Group
-    body, err := io.ReadAll(response.Body)
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    if err := json.Unmarshal(body, &group); err != nil {
-        log.Fatal(err)
-    }
-
+    c.getItem(fmt.Sprintf("groups/%s", uid), &group)
     return &group
 }

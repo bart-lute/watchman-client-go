@@ -7,6 +7,7 @@ import (
     "log"
     "net/http"
     "net/url"
+    "strconv"
     "strings"
     "time"
 )
@@ -23,7 +24,7 @@ func Init(baseUrl string, apiKey string) *Client {
     return &Client{baseUrl, apiKey, &http.Client{Timeout: timeout}}
 }
 
-func (c *Client) doRequest(method string, endPoint string, requestBody any) *http.Response {
+func (c *Client) doRequest(method string, endPoint string, requestBody any, requestHeaders map[string]string) *http.Response {
 
     // Whatever the endPoint is, we always want to add the API Key to the query parameters
     u, err := url.Parse(fmt.Sprintf("%s/%s", c.baseUrl, endPoint))
@@ -51,6 +52,11 @@ func (c *Client) doRequest(method string, endPoint string, requestBody any) *htt
 
     request.Header.Add("Accept", "application/json")
     request.Header.Add("Content-Type", "application/json")
+    if requestHeaders != nil {
+        for key, value := range requestHeaders {
+            request.Header.Add(key, value)
+        }
+    }
 
     response, err := c.httpClient.Do(request)
     if err != nil {
@@ -62,4 +68,71 @@ func (c *Client) doRequest(method string, endPoint string, requestBody any) *htt
     }
 
     return response
+}
+
+func (c *Client) getList(endpoint string, responseBody any) {
+
+    var items []any
+    page := 1
+    for {
+        response := c.doRequest("GET", fmt.Sprintf("%s?page=%d", endpoint, page), nil, nil)
+        totalPages, err := strconv.Atoi(response.Header.Get("x-total-pages"))
+        if err != nil {
+            log.Fatal(err)
+        }
+
+        body, err := io.ReadAll(response.Body)
+        if err != nil {
+            log.Fatal(err)
+        }
+        err = response.Body.Close()
+        if err != nil {
+            log.Fatal(err)
+        }
+
+        var pageItems []any
+        err = json.Unmarshal(body, &pageItems)
+        if err != nil {
+            log.Fatal(err)
+        }
+        items = append(items, pageItems...)
+
+        if page >= totalPages {
+            break
+        }
+        page++
+    }
+
+    bytes, err := json.Marshal(items)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    err = json.Unmarshal(bytes, responseBody)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+}
+
+func (c *Client) getItem(endpoint string, responseBody any) {
+    response := c.doRequest("GET", endpoint, nil, nil)
+
+    // Make sure to close the Body
+    defer func(Body io.ReadCloser) {
+        err := Body.Close()
+        if err != nil {
+            log.Fatal(err)
+        }
+    }(response.Body)
+
+    body, err := io.ReadAll(response.Body)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    if err := json.Unmarshal(body, responseBody); err != nil {
+        log.Fatal(err)
+    }
+
 }
